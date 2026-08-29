@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+build/
+
+# Env
+.env
+
+# Generated reports
+reports/*.pdf
+!reports/.gitkeep
+
+# OS
+.DS_Store
