@@ -28,17 +28,12 @@ calculator_agent = Agent(
 async def handle_tax_input(ctx: Context, sender: str, msg: TaxInput):
     ctx.logger.info(f"Received TaxInput from {sender}: {msg}")
 
-    # TODO: call tax_rules.calculate_tax(...) once implemented, then build
-    # and send back a TaxBreakdown matching agents/common/models.py.
-    #
-    # breakdown_dict = tax_rules.calculate_tax(
-    #     annual_income=msg.annual_income,
-    #     standard_deduction=msg.standard_deduction,
-    #     employer_nps_contribution=msg.employer_nps_contribution,
-    # )
-    # await ctx.send(sender, TaxBreakdown(**breakdown_dict))
-
-    raise NotImplementedError("TODO: wire up tax_rules.calculate_tax and reply")
+    breakdown_dict = tax_rules.calculate_tax(
+        annual_income=msg.annual_income,
+        standard_deduction=msg.standard_deduction,
+        employer_nps_contribution=msg.employer_nps_contribution,
+    )
+    await ctx.send(sender, TaxBreakdown(**breakdown_dict))
 
 
 if __name__ == "__main__":

@@ -44,81 +44,118 @@ ITR_FILING_DEADLINE_MONTH_DAY = "07-31"
 
 
 def calculate_slab_tax(taxable_income: int) -> dict:
-    """
-    Compute slab-wise tax on `taxable_income`.
+    if taxable_income < 0:
+        taxable_income = 0
 
-    Returns a dict matching the `SlabTax` schema in models.py:
-        {"slabs_applied": [...], "total_before_rebate": int}
+    slabs_applied = []
+    total_before_rebate = 0
 
-    Only include slabs actually reached by this income (don't emit slabs with
-    zero income in them once income is fully below a slab's lower bound).
+    for lower, upper, rate in SLABS:
+        if taxable_income <= lower:
+            break
 
-    TODO(backend owner): implement.
-    """
-    raise NotImplementedError("TODO: implement calculate_slab_tax")
+        slab_top = upper if upper is not None else taxable_income
+        amount_in_slab = min(taxable_income, slab_top) - lower
+        if amount_in_slab <= 0:
+            continue
+
+        tax_in_slab = round(amount_in_slab * rate / 100)
+        slabs_applied.append({
+            "range": f"{lower}-{upper if upper is not None else 'above'}",
+            "rate_percent": rate,
+            "tax": tax_in_slab,
+        })
+        total_before_rebate += tax_in_slab
+
+    return {"slabs_applied": slabs_applied, "total_before_rebate": total_before_rebate}
 
 
 def apply_rebate_and_marginal_relief(taxable_income: int, tax_before_rebate: int) -> dict:
-    """
-    Apply Section 87A rebate and marginal relief.
+    if taxable_income <= REBATE_87A_INCOME_THRESHOLD:
+        rebate = min(tax_before_rebate, REBATE_87A_MAX)
+        return {
+            "rebate_87a": rebate,
+            "marginal_relief": 0,
+            "tax_after_rebate": tax_before_rebate - rebate,
+        }
 
-    Returns:
-        {"rebate_87a": int, "marginal_relief": int, "tax_after_rebate": int}
+    excess_over_threshold = taxable_income - REBATE_87A_INCOME_THRESHOLD
+    if tax_before_rebate > excess_over_threshold:
+        relief = tax_before_rebate - excess_over_threshold
+        tax_after_rebate = excess_over_threshold
+    else:
+        relief = 0
+        tax_after_rebate = tax_before_rebate
 
-    Rules:
-      - If taxable_income <= REBATE_87A_INCOME_THRESHOLD: rebate_87a = min(tax_before_rebate, REBATE_87A_MAX),
-        tax_after_rebate = tax_before_rebate - rebate_87a (should land at 0 for typical cases).
-      - Marginal relief: for taxable_income just above the threshold, tax payable should not
-        exceed (taxable_income - REBATE_87A_INCOME_THRESHOLD) — i.e. you never take home less
-        post-tax than someone right at the threshold. Only relevant in a narrow band above 12L.
-
-    TODO(backend owner): implement.
-    """
-    raise NotImplementedError("TODO: implement apply_rebate_and_marginal_relief")
+    return {"rebate_87a": 0, "marginal_relief": relief, "tax_after_rebate": tax_after_rebate}
 
 
 def calculate_tax(annual_income: int, standard_deduction: int = STANDARD_DEDUCTION_DEFAULT,
                    employer_nps_contribution: int = 0) -> dict:
-    """
-    Full pipeline: gross income -> TaxBreakdown dict (matches models.TaxBreakdown).
+    total_deductions = standard_deduction + employer_nps_contribution
+    taxable_income = max(0, annual_income - total_deductions)
 
-    Steps:
-      1. total_deductions = standard_deduction + employer_nps_contribution
-      2. taxable_income = annual_income - total_deductions
-      3. slab_tax = calculate_slab_tax(taxable_income)
-      4. rebate/marginal relief = apply_rebate_and_marginal_relief(...)
-      5. cess_amount = round(tax_after_rebate * CESS_PERCENT / 100)
-      6. net_tax_payable = tax_after_rebate + cess_amount
+    slab_tax = calculate_slab_tax(taxable_income)
+    rebate_result = apply_rebate_and_marginal_relief(taxable_income, slab_tax["total_before_rebate"])
 
-    TODO(backend owner): implement, using the two helpers above.
-    """
-    raise NotImplementedError("TODO: implement calculate_tax")
+    tax_after_rebate = rebate_result["tax_after_rebate"]
+    cess_amount = round(tax_after_rebate * CESS_PERCENT / 100)
+    net_tax_payable = tax_after_rebate + cess_amount
+
+    return {
+        "gross_income": annual_income,
+        "total_deductions": total_deductions,
+        "taxable_income": taxable_income,
+        "slab_tax": slab_tax,
+        "rebate_87a": rebate_result["rebate_87a"],
+        "marginal_relief": rebate_result["marginal_relief"],
+        "tax_after_rebate": tax_after_rebate,
+        "cess_percent": CESS_PERCENT,
+        "cess_amount": cess_amount,
+        "net_tax_payable": net_tax_payable,
+    }
 
 
 def build_advance_tax_schedule(net_tax_payable: int, financial_year_start: int) -> List[dict]:
-    """
-    Build the four advance-tax installments for the given liability.
+    if net_tax_payable <= 10_000:
+        return []
 
-    `financial_year_start` = the year the FY starts (e.g. 2026 for FY2026-27's
-    payment cycle following a FY2025-26 income calculation at filing time —
-    double check which cycle applies before wiring this into the agent).
+    schedule = []
+    cumulative_paid = 0
 
-    Returns a list of dicts matching AdvanceTaxInstallment:
-        [{"due_date": "YYYY-MM-DD", "percent_of_liability": int, "amount": int}, ...]
+    for month_day, cumulative_percent in ADVANCE_TAX_SCHEDULE_TEMPLATE:
+        month = month_day.split("-")[0]
+        year = financial_year_start + 1 if month == "03" else financial_year_start
+        cumulative_amount = round(net_tax_payable * cumulative_percent / 100)
+        installment_amount = cumulative_amount - cumulative_paid
 
-    TODO(backend owner): implement using ADVANCE_TAX_SCHEDULE_TEMPLATE.
-    """
-    raise NotImplementedError("TODO: implement build_advance_tax_schedule")
+        schedule.append({
+            "due_date": f"{year}-{month_day}",
+            "percent_of_liability": cumulative_percent,
+            "amount": cumulative_amount,
+        })
+        cumulative_paid = cumulative_amount
+
+    return schedule
 
 
 def build_optimization_note(taxable_income: int, net_tax_payable: int) -> str:
-    """
-    Plain-language nudge, e.g. "You're Rs. X above the zero-tax threshold —
-    additional employer NPS contribution of Rs. X would bring your net tax to 0."
+    if net_tax_payable == 0:
+        return "Your net tax payable is already zero under the new regime — no further action needed."
 
-    Keep it a single sentence. Only mention the NPS lever (it's the only
-    deduction lever available in the new regime for this MVP).
+    if taxable_income > REBATE_87A_INCOME_THRESHOLD:
+        gap = taxable_income - REBATE_87A_INCOME_THRESHOLD
+        if gap <= 500_000:
+            return (
+                f"An additional employer NPS contribution (Section 80CCD(2)) of roughly "
+                f"Rs. {gap:,} would bring your taxable income down to the Rs. 12,00,000 "
+                f"zero-tax threshold under the new regime."
+            )
+        return (
+            "Your taxable income is well above the zero-tax threshold, so reaching "
+            "zero tax via employer NPS alone isn't realistic — maximizing your "
+            "Section 80CCD(2) employer NPS contribution is still the main lever "
+            "available in the new regime to reduce taxable income."
+        )
 
-    TODO(backend owner / whoever builds the Action-Plan agent): implement.
-    """
-    raise NotImplementedError("TODO: implement build_optimization_note")
+    return "You're within the zero-tax threshold already; no further deduction is needed."

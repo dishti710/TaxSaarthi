@@ -28,18 +28,32 @@ async def calculate_tax(payload: TaxInput):
                                "field": "annual_income"}},
         )
 
-    # TODO once tax_rules is implemented:
-    #   breakdown = tax_rules.calculate_tax(...)
-    #   action_plan = ... (advance tax schedule + optimization note + PDF)
-    #   report_id = str(uuid.uuid4())
-    #   report = TaxReport(report_id=report_id, input=payload, breakdown=breakdown, action_plan=action_plan)
-    #   _REPORTS[report_id] = report
-    #   return report
+    from agents.common.models import TaxBreakdown, ActionPlan
 
-    raise HTTPException(status_code=500, detail={"error": {"code": "INTERNAL_ERROR",
-                         "message": "Not implemented yet"}})
+    breakdown_dict = tax_rules.calculate_tax(
+        annual_income=payload.annual_income,
+        standard_deduction=payload.standard_deduction,
+        employer_nps_contribution=payload.employer_nps_contribution,
+    )
+    breakdown = TaxBreakdown(**breakdown_dict)
 
+    schedule = tax_rules.build_advance_tax_schedule(breakdown.net_tax_payable, financial_year_start=2026)
+    note = tax_rules.build_optimization_note(breakdown.taxable_income, breakdown.net_tax_payable)
 
+    report_id = str(uuid.uuid4())
+
+    action_plan = ActionPlan(
+        filing_deadline=f"2026-{tax_rules.ITR_FILING_DEADLINE_MONTH_DAY}",
+        advance_tax_required=len(schedule) > 0,
+        advance_tax_schedule=schedule,
+        optimization_note=note,
+        report_download_url=f"/api/tax/report/{report_id}/download",
+    )
+
+    report = TaxReport(report_id=report_id, input=payload, breakdown=breakdown, action_plan=action_plan)
+    _REPORTS[report_id] = report
+    return report
+    
 @router.get("/report/{report_id}", response_model=TaxReport)
 async def get_report(report_id: str):
     report = _REPORTS.get(report_id)
