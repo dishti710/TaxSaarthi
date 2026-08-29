@@ -8,8 +8,7 @@ Owner: Member 4 (also owns the PDF template).
 
 STATUS: JSON action-plan logic is wired and working (schedule + optimization
 note, using the same tax_rules functions as the FastAPI backend). PDF
-generation is still a TODO for Member 4 — report_download_url is a
-placeholder path until that's added; it doesn't point at a real file yet.
+generation is now wired in via pdf_generator.generate_tax_report_pdf.
 """
 
 import os
@@ -20,6 +19,7 @@ from uagents import Agent, Context
 
 from agents.common.models import TaxBreakdown, ActionPlan
 from agents.common import tax_rules
+from agents.common.pdf_generator import generate_tax_report_pdf
 
 actionplan_agent = Agent(
     name="tax_actionplan_agent",
@@ -42,15 +42,24 @@ async def handle_tax_breakdown(ctx: Context, sender: str, msg: TaxBreakdown):
     note = tax_rules.build_optimization_note(msg.taxable_income, msg.net_tax_payable)
 
     report_id = str(uuid.uuid4())
+    filing_deadline = f"{FINANCIAL_YEAR_START + 1}-{tax_rules.ITR_FILING_DEADLINE_MONTH_DAY}"
 
-    # TODO(Member 4): generate a real PDF from msg + schedule + note, save to
-    # /reports/<report_id>.pdf, and serve it from backend/routers/tax.py's
-    # GET /report/{id}/download. Until then this is a placeholder path —
-    # the JSON action plan itself is fully correct and testable right now.
+    generate_tax_report_pdf(
+        report_id=report_id,
+        breakdown=msg.dict(),          # or msg.model_dump() if using pydantic v2
+        action_plan={
+            "filing_deadline": filing_deadline,
+            "advance_tax_required": len(schedule) > 0,
+            "advance_tax_schedule": schedule,
+            "optimization_note": note,
+        },
+        reports_dir="reports",
+    )
+
     report_download_url = f"/api/tax/report/{report_id}/download"
 
     action_plan = ActionPlan(
-        filing_deadline=f"{FINANCIAL_YEAR_START + 1}-{tax_rules.ITR_FILING_DEADLINE_MONTH_DAY}",
+        filing_deadline=filing_deadline,
         advance_tax_required=len(schedule) > 0,
         advance_tax_schedule=schedule,
         optimization_note=note,
