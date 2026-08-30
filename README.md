@@ -5,8 +5,6 @@ under India's **New Tax Regime (FY 2025-26)** from a natural-language descriptio
 of their income, and turns the result into a concrete action plan (advance-tax
 schedule, filing deadline, optimization nudge) — not just a number.
 
-Built for [hackathon name] — 10-hour build window, 4-person team.
-
 ## Scope (MVP)
 
 - New Regime only. No old-regime comparison.
@@ -53,7 +51,7 @@ tax-action-agent/
 └── .env.example
 ```
 
-## Getting started (everyone, first 30 minutes)
+## Getting started
 
 1. Read `agents/common/models.py` — this is the shared contract for agent-to-agent
    messages, same role as `API_CONTRACT.md` but internal. **Do not change field
@@ -62,16 +60,7 @@ tax-action-agent/
 3. Copy `.env.example` to `.env` and fill in your own values (Agentverse/API keys
    go in yours only, never commit `.env`).
 
-## Who owns what
-
-| Area | Owner | Files |
-|---|---|---|
-| Backend / tax logic | Backend dev | `agents/common/tax_rules.py`, `backend/` |
-| Frontend | Frontend dev | `frontend/` |
-| Agents / ASI:One / Agentverse integration | Member 3 | `agents/coordinator_agent.py`, `agents/actionplan_agent.py` |
-| Testing / deploy / demo / PDF template | Member 4 | test scripts, Agentverse mailbox setup, demo script |
-
-## Running locally (fill in once implemented)
+## Running locally
 
 ```bash
 # Backend
