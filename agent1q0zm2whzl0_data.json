@@ -1,0 +1,5 @@
+{
+    "pending_sender": "agent1q0vz2ke8mrc00sjhtv2mxnur2uamtqduyh00lcaax6jk5cjrtrs0yp9lf7e",
+    "pending_tax_input": "{\"annual_income\":1400000,\"standard_deduction\":75000,\"employer_nps_contribution\":50000,\"regime\":\"new\"}",
+    "pending_breakdown": "{\"gross_income\":1400000,\"total_deductions\":125000,\"taxable_income\":1275000,\"slab_tax\":{\"slabs_applied\":[{\"range\":\"0-400000\",\"rate_percent\":0,\"tax\":0},{\"range\":\"400000-800000\",\"rate_percent\":5,\"tax\":20000},{\"range\":\"800000-1200000\",\"rate_percent\":10,\"tax\":40000},{\"range\":\"1200000-1600000\",\"rate_percent\":15,\"tax\":11250}],\"total_before_rebate\":71250},\"rebate_87a\":0,\"marginal_relief\":0,\"tax_after_rebate\":71250,\"cess_percent\":4,\"cess_amount\":2850,\"net_tax_payable\":74100}"
+}
